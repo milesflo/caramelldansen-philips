@@ -4,6 +4,10 @@ import socket
 import argparse
 import typing
 import time
+from itertools import cycle
+from aioify import aioify
+import asyncio
+
 from phue import Bridge, Group, Light, PhueRegistrationException
 
 parser = argparse.ArgumentParser(description="Control your lights! Party time ðŸŒˆ")
@@ -11,6 +15,12 @@ parser = argparse.ArgumentParser(description="Control your lights! Party time ðŸ
 parser.add_argument('--ip', dest='ip', help='IP of Bridge')
 parser.add_argument('--group', dest='group', help='Group of lights targetted for party mode')
 parser.add_argument('--debug', dest='debug', action='store_true', help="Enter color debug mode")
+
+speed: float = 0.2 # Configurable speed
+RED: int = 2000
+CYAN: int = 39000
+PURPLE: int = 55000
+YELLOW: int = 10000
 
 def connect(ip: str) -> Bridge:
     if not ip:
@@ -37,27 +47,35 @@ def get_group_lights(group_name: str) -> list:
 
     return group.lights
 
+
+async def set_group_hue(lights: typing.List[Light], hue: int):
+    ops = list(map(lambda x: b.aio_set_light(x.light_id, 'hue', hue, transitiontime=0.1), lights))
+
+    await asyncio.gather(*ops)
+
+
 def party_time(lights: typing.List[Light]):
 
+    preflight_command = {
+        'transitiontime': speed,
+        'on': True,
+        'bri': 254,
+        'saturation': 254,
+        'hue': YELLOW
+    }
+
     for light in lights:
-        light.transitiontime=0.1
-    loop = True
+        light.on = preflight_command['on']
+        light.transitiontime = preflight_command['transitiontime']
+        light.bri = preflight_command['bri']
+        light.saturation = preflight_command['saturation']
+        light.hue = preflight_command['hue']
 
-    RED = 2000
-    CYAN   = 39000
-    PURPLE = 55000
-    YELLOW = 10000
+    hues: typing.Iterable[int] = iter([YELLOW, RED, CYAN, PURPLE])
 
-    hues = [YELLOW, RED, CYAN, PURPLE]
-
-    i = 0
-
-    while loop:
-        for light in lights:
-            
-            light.hue = hues[i % len(hues)]
-        i+=1
-        time.sleep(0.1)
+    for hue in cycle(hues):
+        asyncio.run(set_group_hue(lights, hue))
+        time.sleep(speed)
 
 def debug_color(lights: typing.List[Light]):
     print("Entering debug mode")
@@ -76,7 +94,7 @@ if __name__ == "__main__":
     global b
     b = connect(args.ip)
 
-    b.get_group_id_by_name
+    b.aio_set_light = aioify(obj=b.set_light)
 
     if args.group:
         lights: typing.List[Light] = get_group_lights(group_name=args.group)

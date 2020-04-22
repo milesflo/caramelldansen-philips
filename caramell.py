@@ -24,7 +24,7 @@ def connect(ip: str) -> Bridge:
     try:
         bridge = Bridge(ip)
     except PhueRegistrationException:
-        print("Go press the button on your Bridge!")
+        print("Go press the button on your Bridge and try again! Quick!")
     
     return bridge
 
@@ -33,7 +33,7 @@ def get_group_lights(group_name: str) -> list:
 
     group_id = b.get_group_id_by_name(group_name)
 
-    group = b.groups[group_id - 1]
+    group = b.groups[group_id - 1] # 1-indexing? In Python?? Good lord...
 
     return group.lights
 
